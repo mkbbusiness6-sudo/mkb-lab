@@ -54,19 +54,27 @@ jobs:
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       # --------------------------------------------------------
-      # 5. Vérification Laravel
+      # 5. Préparation Laravel
+      # --------------------------------------------------------
+      - name: Prepare Laravel
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      # --------------------------------------------------------
+      # 6. Vérification Laravel
       # --------------------------------------------------------
       - name: Check Laravel
         run: php artisan --version
 
       # --------------------------------------------------------
-      # 6. Tests Laravel
+      # 7. Tests Laravel
       # --------------------------------------------------------
       - name: Run Laravel tests
         run: php artisan test
 
       # --------------------------------------------------------
-      # 7. Installation Node.js
+      # 8. Installation Node.js
       # --------------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -75,13 +83,13 @@ jobs:
           cache: npm
 
       # --------------------------------------------------------
-      # 8. Installation dépendances JavaScript
+      # 9. Installation dépendances JavaScript
       # --------------------------------------------------------
       - name: Install frontend dependencies
         run: npm ci
 
       # --------------------------------------------------------
-      # 9. Compilation frontend
+      # 10. Compilation frontend
       # --------------------------------------------------------
       - name: Build frontend
         run: npm run build
