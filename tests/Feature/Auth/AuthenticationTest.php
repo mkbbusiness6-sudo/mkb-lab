@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
 test('login screen can be rendered', function () {
@@ -23,7 +24,11 @@ test('users can authenticate using the login screen', function () {
 });
 
 test('users with two factor enabled are redirected to two factor challenge', function () {
-    $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
+    if (! Features::enabled(Features::twoFactorAuthentication())) {
+        expect(Route::has('two-factor.login'))->toBeFalse();
+
+        return;
+    }
 
     Features::twoFactorAuthentication([
         'confirm' => true,
