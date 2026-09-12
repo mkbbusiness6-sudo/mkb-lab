@@ -1,4 +1,4 @@
-name: Deploy mkbLab Application
+name: Deploy Laravel Application
 
 on:
   push:
@@ -14,26 +14,18 @@ concurrency:
   group: production
   cancel-in-progress: false
 
-jobs:
+env:
+  APP_PATH: /var/www/mkb-lab
 
-  # ============================================================
-  # CI - Vérification du projet
-  # ============================================================
+jobs:
   ci:
     name: Continuous Integration
     runs-on: ubuntu-latest
 
     steps:
-
-      # --------------------------------------------------------
-      # 1. Récupération du code
-      # --------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # --------------------------------------------------------
-      # 2. Installation PHP
-      # --------------------------------------------------------
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -41,117 +33,189 @@ jobs:
           extensions: mbstring, dom, fileinfo, pgsql, pdo_pgsql, redis
           coverage: none
 
-      # --------------------------------------------------------
-      # 3. Vérification Composer
-      # --------------------------------------------------------
       - name: Validate Composer
         run: composer validate --strict
 
-      # --------------------------------------------------------
-      # 4. Installation des dépendances PHP
-      # --------------------------------------------------------
       - name: Install Composer dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+        run: composer install \
+          --no-interaction \
+          --prefer-dist \
+          --optimize-autoloader
 
-      # --------------------------------------------------------
-      # 5. Préparation Laravel
-      # --------------------------------------------------------
-      - name: Prepare Laravel
-        run: |
-          cp .env.example .env
-          php artisan key:generate --force
-
-      # --------------------------------------------------------
-      # 6. Vérification Laravel
-      # --------------------------------------------------------
       - name: Check Laravel
         run: php artisan --version
 
-      # --------------------------------------------------------
-      # 7. Tests Laravel
-      # --------------------------------------------------------
       - name: Run Laravel tests
         run: php artisan test
 
-      # --------------------------------------------------------
-      # 8. Installation Node.js
-      # --------------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
 
-      # --------------------------------------------------------
-      # 9. Installation dépendances JavaScript
-      # --------------------------------------------------------
       - name: Install frontend dependencies
         run: npm ci
 
-      # --------------------------------------------------------
-      # 10. Compilation frontend
-      # --------------------------------------------------------
       - name: Build frontend
         run: npm run build
 
-
-  # ============================================================
-  # CD - Déploiement sur le VPS
-  # ============================================================
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
-
     needs:
       - ci
 
     steps:
-
-      # --------------------------------------------------------
-      # 1. Connexion SSH et déploiement
-      # --------------------------------------------------------
       - name: Deploy application
         uses: appleboy/ssh-action@v1.2.2
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+          DEPLOY_REF: ${{ github.ref_name }}
+          APP_PATH: /var/www/mkb-lab
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: DEPLOY_SHA,DEPLOY_REF,APP_PATH
 
           script: |
+            set -e
 
             echo "=========================================="
-            echo "Starting Laravel deployment"
+            echo "MKB LAB - PRODUCTION DEPLOYMENT"
             echo "=========================================="
+            echo "Commit: ${DEPLOY_SHA}"
+            echo "Branch: ${DEPLOY_REF}"
+            echo "Application: ${APP_PATH}"
 
-            cd /var/www/mkb-lab
+            mkdir -p "${APP_PATH}/releases"
+            mkdir -p "${APP_PATH}/shared"
+            mkdir -p "${APP_PATH}/shared/storage"
+            mkdir -p "${APP_PATH}/shared/storage/app/public"
 
-            echo "1. Updating source code..."
-            git fetch origin main
-            git reset --hard origin/main
+            RELEASE_ID="$(date +%Y%m%d_%H%M%S)_${DEPLOY_SHA:0:7}"
+            RELEASE_PATH="${APP_PATH}/releases/${RELEASE_ID}"
 
-            echo "2. Installing PHP dependencies..."
+            echo "Release: ${RELEASE_ID}"
+
+            git clone \
+              --no-checkout \
+              --filter=blob:none \
+              git@github.com:mkbbusiness6-sudo/mkb-lab.git \
+              "${RELEASE_PATH}"
+
+            cd "${RELEASE_PATH}"
+
+            git fetch origin "${DEPLOY_SHA}"
+            git checkout --detach "${DEPLOY_SHA}"
+
+            echo "Deployed commit:"
+            git rev-parse HEAD
+
+            if [ ! -f "${APP_PATH}/shared/.env" ]; then
+              echo "ERROR: Production .env does not exist."
+              exit 1
+            fi
+
+            ln -sfn \
+              "${APP_PATH}/shared/.env" \
+              "${RELEASE_PATH}/.env"
+
+            rm -rf "${RELEASE_PATH}/storage"
+
+            ln -sfn \
+              "${APP_PATH}/shared/storage" \
+              "${RELEASE_PATH}/storage"
+
             composer install \
               --no-dev \
               --no-interaction \
               --prefer-dist \
               --optimize-autoloader
 
-            echo "3. Installing frontend dependencies..."
             npm ci
 
-            echo "4. Building frontend..."
             npm run build
 
-            echo "5. Running database migrations..."
-            php artisan migrate --force
+            if [ ! -f "${RELEASE_PATH}/public/build/manifest.json" ]; then
+              echo "ERROR: Vite manifest was not generated."
+              exit 1
+            fi
 
-            echo "6. Clearing Laravel caches..."
+            php artisan storage:link
+
             php artisan optimize:clear
 
-            echo "7. Rebuilding Laravel caches..."
-            php artisan optimize
+            php artisan migrate --force
+
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
+
+            sudo chown -R deploy:www-data \
+              "${RELEASE_PATH}/bootstrap/cache"
+
+            sudo chown -R deploy:www-data \
+              "${APP_PATH}/shared/storage"
+
+            sudo find "${APP_PATH}/shared/storage" \
+              -type d -exec chmod 775 {} \;
+
+            sudo find "${APP_PATH}/shared/storage" \
+              -type f -exec chmod 664 {} \;
+
+            sudo find "${RELEASE_PATH}/bootstrap/cache" \
+              -type d -exec chmod 775 {} \;
+
+            sudo find "${RELEASE_PATH}/bootstrap/cache" \
+              -type f -exec chmod 664 {} \;
+
+            rm -rf "${RELEASE_PATH}/node_modules"
+
+            ln -sfn \
+              "${RELEASE_PATH}" \
+              "${APP_PATH}/current"
+
+            sudo systemctl reload php8.5-fpm
+
+            sudo nginx -t
+
+            sudo systemctl reload nginx
+
+            echo "Checking application health..."
+
+            curl -fsS \
+              "https://mkb-lab.tech/up" \
+              > /dev/null
+
+            echo "Health check: OK"
 
             echo "=========================================="
-            echo "Deployment completed successfully"
+            echo "ACTIVE RELEASE"
             echo "=========================================="
+
+            readlink -f "${APP_PATH}/current"
+
+            echo "=========================================="
+            echo "ACTIVE COMMIT"
+            echo "=========================================="
+
+            git -C "${APP_PATH}/current" rev-parse HEAD
+
+            echo "=========================================="
+            echo "EXPECTED COMMIT"
+            echo "=========================================="
+
+            echo "${DEPLOY_SHA}"
+
+            echo "=========================================="
+            echo "DEPLOYMENT SUCCESSFUL"
+            echo "=========================================="
+
+            cd "${APP_PATH}/releases"
+
+            ls -1dt */ 2>/dev/null \
+              | tail -n +6 \
+              | xargs -r rm -rf
