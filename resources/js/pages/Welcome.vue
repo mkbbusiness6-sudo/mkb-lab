@@ -5,14 +5,18 @@ import {
     ArrowUpRight,
     BookOpen,
     Cpu,
+    Globe,
+    GraduationCap,
+    Hospital,
     Menu,
     MonitorPlay,
     Play,
     Sparkles,
+    Stethoscope,
     Terminal,
     X,
 } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import LabMark from '@/components/LabMark.vue';
 import { dashboard, login } from '@/routes';
 
@@ -60,6 +64,80 @@ const experiments = [
         note: 'Chaque note peut devenir une démo. Lire, puis watch.',
     },
 ];
+
+type ProjectCategory = 'all' | 'hopital' | 'ecole' | 'web';
+
+const projectFilter = ref<ProjectCategory>('all');
+
+const projectFilters: { id: ProjectCategory; label: string }[] = [
+    { id: 'all', label: 'tous' },
+    { id: 'hopital', label: 'hôpital' },
+    { id: 'ecole', label: 'écoles' },
+    { id: 'web', label: 'web' },
+];
+
+const projects = [
+    {
+        code: 'PRJ-001',
+        category: 'hopital' as const,
+        label: 'hôpital',
+        icon: Hospital,
+        title: 'Dossier patient & admissions',
+        note: 'Application interne pour le circuit patient : admissions, file d’attente, dossiers et suivi de service.',
+        stack: ['Laravel', 'Vue', 'PostgreSQL'],
+    },
+    {
+        code: 'PRJ-002',
+        category: 'hopital' as const,
+        label: 'hôpital',
+        icon: Stethoscope,
+        title: 'Cockpit soignants',
+        note: 'Tableau de bord pour les équipes médicales : planning, transmissions, alertes, et vue d’ensemble du service.',
+        stack: ['Laravel', 'Inertia', 'Redis'],
+    },
+    {
+        code: 'PRJ-003',
+        category: 'ecole' as const,
+        label: 'école',
+        icon: GraduationCap,
+        title: 'Portail établissement',
+        note: 'Espace unique pour l’admin, les enseignants et les familles : emploi du temps, notes, et communication.',
+        stack: ['Laravel', 'Vue', 'MySQL'],
+    },
+    {
+        code: 'PRJ-004',
+        category: 'ecole' as const,
+        label: 'école',
+        icon: BookOpen,
+        title: 'Carnet numérique élèves',
+        note: 'Outil scolaire pour le suivi pédagogique, les devoirs et le lien école–parents, sans friction.',
+        stack: ['Vue', 'Inertia', 'Tailwind'],
+    },
+    {
+        code: 'PRJ-005',
+        category: 'web' as const,
+        label: 'web',
+        icon: Globe,
+        title: 'Sites vitrine & landing',
+        note: 'Sites institutionnels et pages produit : structure claire, perf, SEO de base, déploiement propre.',
+        stack: ['Laravel', 'Vue', 'Vite'],
+    },
+    {
+        code: 'PRJ-006',
+        category: 'web' as const,
+        label: 'web',
+        icon: Terminal,
+        title: 'Apps métier sur-mesure',
+        note: 'Applications web pour des process internes : auth, dashboards, workflows, et exports. Du spec au ship.',
+        stack: ['Laravel', 'Fortify', 'PostgreSQL'],
+    },
+];
+
+const visibleProjects = computed(() =>
+    projectFilter.value === 'all'
+        ? projects
+        : projects.filter((project) => project.category === projectFilter.value),
+);
 
 function closeMenu(): void {
     menuOpen.value = false;
@@ -138,6 +216,11 @@ function closeMenu(): void {
                     class="hidden items-center gap-1 font-mono text-[12px] md:flex"
                     aria-label="Navigation principale"
                 >
+                    <a
+                        href="#projets"
+                        class="rounded-md px-3 py-1.5 text-[#5b6578] transition-colors hover:bg-cyan-400/8 hover:text-[#0b1220] dark:text-slate-400 dark:hover:text-cyan-300"
+                        >/projets</a
+                    >
                     <a
                         href="#astuces"
                         class="rounded-md px-3 py-1.5 text-[#5b6578] transition-colors hover:bg-cyan-400/8 hover:text-[#0b1220] dark:text-slate-400 dark:hover:text-cyan-300"
@@ -219,6 +302,12 @@ function closeMenu(): void {
                     class="flex flex-col gap-1 font-mono text-sm"
                     aria-label="Navigation mobile"
                 >
+                    <a
+                        href="#projets"
+                        class="rounded-md px-2 py-2.5"
+                        @click="closeMenu"
+                        >/projets</a
+                    >
                     <a
                         href="#astuces"
                         class="rounded-md px-2 py-2.5"
@@ -452,6 +541,107 @@ function closeMenu(): void {
                             {{ pillar.text }}
                         </p>
                     </article>
+                </div>
+            </section>
+
+            <section id="projets" class="scroll-mt-24 py-20 sm:py-24">
+                <div class="mx-auto max-w-6xl px-5 sm:px-8">
+                    <div
+                        class="flex flex-col justify-between gap-6 lg:flex-row lg:items-end"
+                    >
+                        <div class="max-w-xl">
+                            <p
+                                class="font-mono text-[11px] tracking-[0.2em] text-[#5b6578] uppercase dark:text-cyan-400/80"
+                            >
+                                // shipped
+                            </p>
+                            <h2
+                                class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl"
+                            >
+                                Projets déjà en prod.
+                            </h2>
+                            <p class="mt-3 text-[#5b6578] dark:text-slate-400">
+                                Hôpitaux, écoles, sites web. Des apps livrées,
+                                utilisées, pas des maquettes. Le lab documente
+                                le geste — ici, c’est le travail déjà shippé.
+                            </p>
+                        </div>
+                        <p
+                            class="shrink-0 font-mono text-[11px] tracking-[0.16em] text-[#8b95a7] uppercase dark:text-slate-500"
+                        >
+                            {{ projects.length }} shipped
+                        </p>
+                    </div>
+
+                    <div class="mt-8 flex flex-wrap gap-2">
+                        <button
+                            v-for="filter in projectFilters"
+                            :key="filter.id"
+                            type="button"
+                            class="rounded-md px-3 py-1.5 font-mono text-[11px] tracking-wide uppercase transition-colors"
+                            :class="
+                                projectFilter === filter.id
+                                    ? 'border border-transparent bg-linear-to-r from-cyan-400 to-violet-500 font-semibold text-[#070b14]'
+                                    : 'border border-[#0b1220]/10 text-[#5b6578] hover:border-cyan-400/40 hover:text-[#0b1220] dark:border-white/10 dark:text-slate-400 dark:hover:text-cyan-300'
+                            "
+                            @click="projectFilter = filter.id"
+                        >
+                            {{ filter.label }}
+                        </button>
+                    </div>
+
+                    <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <article
+                            v-for="project in visibleProjects"
+                            :key="project.code"
+                            class="group flex flex-col rounded-xl border border-[#0b1220]/10 bg-white p-5 transition-colors hover:border-cyan-400/35 dark:border-cyan-400/12 dark:bg-[#0e1522] dark:hover:border-cyan-400/30"
+                        >
+                            <div class="flex items-start justify-between gap-3">
+                                <span
+                                    class="flex size-10 items-center justify-center rounded-md border border-cyan-400/25 text-cyan-600 dark:text-cyan-300"
+                                >
+                                    <component
+                                        :is="project.icon"
+                                        class="size-5"
+                                    />
+                                </span>
+                                <span
+                                    class="rounded-md bg-cyan-400/12 px-2 py-0.5 font-mono text-[10px] tracking-[0.16em] text-cyan-700 uppercase dark:text-cyan-300"
+                                >
+                                    {{ project.label }}
+                                </span>
+                            </div>
+                            <p
+                                class="mt-5 font-mono text-[10px] tracking-[0.16em] text-[#8b95a7] uppercase dark:text-slate-500"
+                            >
+                                {{ project.code }}
+                            </p>
+                            <h3
+                                class="mt-2 text-lg font-semibold tracking-tight"
+                            >
+                                {{ project.title }}
+                            </h3>
+                            <p
+                                class="mt-2 flex-1 text-sm leading-relaxed text-[#5b6578] dark:text-slate-400"
+                            >
+                                {{ project.note }}
+                            </p>
+                            <div class="mt-5 flex flex-wrap gap-1.5">
+                                <span
+                                    v-for="tool in project.stack"
+                                    :key="tool"
+                                    class="rounded-md border border-[#0b1220]/8 px-2 py-0.5 font-mono text-[10px] text-[#5b6578] dark:border-white/8 dark:text-slate-400"
+                                >
+                                    {{ tool }}
+                                </span>
+                            </div>
+                            <p
+                                class="mt-4 font-mono text-[11px] tracking-[0.14em] text-cyan-700 uppercase dark:text-cyan-400/80"
+                            >
+                                shipped
+                            </p>
+                        </article>
+                    </div>
                 </div>
             </section>
 
