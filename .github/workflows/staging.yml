@@ -1,10 +1,10 @@
 ```yaml
-name: MKB Lab — Production
+name: MKB Lab — Staging
 
 on:
   push:
     branches:
-      - main
+      - develop
 
   workflow_dispatch:
 
@@ -12,11 +12,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: production
+  group: staging
   cancel-in-progress: false
 
 env:
-  APP_PATH: /var/www/mkb-lab
+  APP_PATH: /var/www/mkb-lab-staging
 
 jobs:
 
@@ -66,9 +66,8 @@ jobs:
         run: npm run build
 
   deploy:
-    name: Deploy to Production
+    name: Deploy to Staging
     runs-on: ubuntu-latest
-
     needs:
       - ci
 
@@ -79,7 +78,7 @@ jobs:
         env:
           DEPLOY_SHA: ${{ github.sha }}
           DEPLOY_REF: ${{ github.ref_name }}
-          APP_PATH: /var/www/mkb-lab
+          APP_PATH: /var/www/mkb-lab-staging
 
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -92,7 +91,7 @@ jobs:
             set -e
 
             echo "=========================================="
-            echo "MKB LAB - PRODUCTION DEPLOYMENT"
+            echo "MKB LAB - STAGING DEPLOYMENT"
             echo "=========================================="
 
             echo "Commit: ${DEPLOY_SHA}"
@@ -103,6 +102,12 @@ jobs:
             mkdir -p "${APP_PATH}/shared"
             mkdir -p "${APP_PATH}/shared/storage"
             mkdir -p "${APP_PATH}/shared/storage/app/public"
+
+            mkdir -p "${APP_PATH}/shared/storage/framework/cache/data"
+            mkdir -p "${APP_PATH}/shared/storage/framework/sessions"
+            mkdir -p "${APP_PATH}/shared/storage/framework/testing"
+            mkdir -p "${APP_PATH}/shared/storage/framework/views"
+            mkdir -p "${APP_PATH}/shared/storage/logs"
 
             RELEASE_ID="$(date +%Y%m%d_%H%M%S)_${DEPLOY_SHA:0:7}"
             RELEASE_PATH="${APP_PATH}/releases/${RELEASE_ID}"
@@ -124,7 +129,7 @@ jobs:
             git rev-parse HEAD
 
             if [ ! -f "${APP_PATH}/shared/.env" ]; then
-              echo "ERROR: Production .env does not exist."
+              echo "ERROR: Staging .env does not exist."
               exit 1
             fi
 
@@ -193,10 +198,10 @@ jobs:
 
             sudo systemctl reload nginx
 
-            echo "Checking production application health..."
+            echo "Checking staging application health..."
 
             curl -fsS \
-              "https://mkb-lab.tech/up" \
+              "https://staging.mkb-lab.tech/up" \
               > /dev/null
 
             echo "Health check: OK"
@@ -220,7 +225,7 @@ jobs:
             echo "${DEPLOY_SHA}"
 
             echo "=========================================="
-            echo "PRODUCTION DEPLOYMENT SUCCESSFUL"
+            echo "STAGING DEPLOYMENT SUCCESSFUL"
             echo "=========================================="
 
             cd "${APP_PATH}/releases"
