@@ -233,4 +233,3 @@ jobs:
             ls -1dt */ 2>/dev/null \
               | tail -n +6 \
               | xargs -r rm -rf
-```
