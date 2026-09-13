@@ -1,5 +1,4 @@
-```yaml
-name: MKB Lab — Staging
+name: MKB Lab Staging
 
 on:
   push:
@@ -19,13 +18,11 @@ env:
   APP_PATH: /var/www/mkb-lab-staging
 
 jobs:
-
   ci:
     name: CI / Tests
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -72,21 +69,18 @@ jobs:
       - ci
 
     steps:
-
       - name: Deploy application
         uses: appleboy/ssh-action@v1.2.2
         env:
           DEPLOY_SHA: ${{ github.sha }}
           DEPLOY_REF: ${{ github.ref_name }}
           APP_PATH: /var/www/mkb-lab-staging
-
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           port: ${{ secrets.VPS_PORT }}
           key: ${{ secrets.VPS_SSH_KEY }}
           envs: DEPLOY_SHA,DEPLOY_REF,APP_PATH
-
           script: |
             set -e
 
@@ -102,23 +96,18 @@ jobs:
             mkdir -p "${APP_PATH}/shared"
             mkdir -p "${APP_PATH}/shared/storage"
             mkdir -p "${APP_PATH}/shared/storage/app/public"
-
             mkdir -p "${APP_PATH}/shared/storage/framework/cache/data"
             mkdir -p "${APP_PATH}/shared/storage/framework/sessions"
             mkdir -p "${APP_PATH}/shared/storage/framework/testing"
             mkdir -p "${APP_PATH}/shared/storage/framework/views"
             mkdir -p "${APP_PATH}/shared/storage/logs"
 
-            RELEASE_ID="$(date +%Y%m%d_%H%M%S)_${DEPLOY_SHA:0:7}"
+            RELEASE_ID="$(date +%Y%m%d_%H%M%S)_$(echo "${DEPLOY_SHA}" | cut -c1-7)"
             RELEASE_PATH="${APP_PATH}/releases/${RELEASE_ID}"
 
             echo "Release: ${RELEASE_ID}"
 
-            git clone \
-              --no-checkout \
-              --filter=blob:none \
-              git@github.com:mkbbusiness6-sudo/mkb-lab.git \
-              "${RELEASE_PATH}"
+            git clone --no-checkout --filter=blob:none git@github.com:mkbbusiness6-sudo/mkb-lab.git "${RELEASE_PATH}"
 
             cd "${RELEASE_PATH}"
 
@@ -133,21 +122,13 @@ jobs:
               exit 1
             fi
 
-            ln -sfn \
-              "${APP_PATH}/shared/.env" \
-              "${RELEASE_PATH}/.env"
+            ln -sfn "${APP_PATH}/shared/.env" "${RELEASE_PATH}/.env"
 
             rm -rf "${RELEASE_PATH}/storage"
 
-            ln -sfn \
-              "${APP_PATH}/shared/storage" \
-              "${RELEASE_PATH}/storage"
+            ln -sfn "${APP_PATH}/shared/storage" "${RELEASE_PATH}/storage"
 
-            composer install \
-              --no-dev \
-              --no-interaction \
-              --prefer-dist \
-              --optimize-autoloader
+            composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
             npm ci
 
@@ -168,41 +149,25 @@ jobs:
             php artisan route:cache
             php artisan view:cache
 
-            sudo chown -R deploy:www-data \
-              "${RELEASE_PATH}/bootstrap/cache"
+            sudo chown -R deploy:www-data "${RELEASE_PATH}/bootstrap/cache"
+            sudo chown -R deploy:www-data "${APP_PATH}/shared/storage"
 
-            sudo chown -R deploy:www-data \
-              "${APP_PATH}/shared/storage"
-
-            sudo find "${APP_PATH}/shared/storage" \
-              -type d -exec chmod 775 {} \;
-
-            sudo find "${APP_PATH}/shared/storage" \
-              -type f -exec chmod 664 {} \;
-
-            sudo find "${RELEASE_PATH}/bootstrap/cache" \
-              -type d -exec chmod 775 {} \;
-
-            sudo find "${RELEASE_PATH}/bootstrap/cache" \
-              -type f -exec chmod 664 {} \;
+            sudo find "${APP_PATH}/shared/storage" -type d -exec chmod 775 {} \;
+            sudo find "${APP_PATH}/shared/storage" -type f -exec chmod 664 {} \;
+            sudo find "${RELEASE_PATH}/bootstrap/cache" -type d -exec chmod 775 {} \;
+            sudo find "${RELEASE_PATH}/bootstrap/cache" -type f -exec chmod 664 {} \;
 
             rm -rf "${RELEASE_PATH}/node_modules"
 
-            ln -sfn \
-              "${RELEASE_PATH}" \
-              "${APP_PATH}/current"
+            ln -sfn "${RELEASE_PATH}" "${APP_PATH}/current"
 
             sudo systemctl reload php8.5-fpm
-
             sudo nginx -t
-
             sudo systemctl reload nginx
 
             echo "Checking staging application health..."
 
-            curl -fsS \
-              "https://staging.mkb-lab.tech/up" \
-              > /dev/null
+            curl -fsS "https://staging.mkb-lab.tech/up" > /dev/null
 
             echo "Health check: OK"
 
@@ -230,6 +195,4 @@ jobs:
 
             cd "${APP_PATH}/releases"
 
-            ls -1dt */ 2>/dev/null \
-              | tail -n +6 \
-              | xargs -r rm -rf
+            ls -1dt */ 2>/dev/null | tail -n +6 | xargs -r rm -rf
